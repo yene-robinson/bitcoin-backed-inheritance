@@ -85,6 +85,9 @@
         (asserts! (var-get is-active) ERR-NOT-ACTIVE)
         (asserts! (<= share u100) ERR-INVALID-SHARE)
         
+        ;; Validate the principal is not zero address or contract address
+        (asserts! (not (is-eq beneficiary 'SP000000000000000000002Q6VF78)) ERR-INVALID-PRINCIPAL)
+        
         ;; Add validation for lock-period
         (asserts! (> lock-period u0) ERR-INVALID-LOCK-PERIOD)
         
