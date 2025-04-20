@@ -212,3 +212,55 @@
             (ok true))
     )
 )
+
+;; Automatic dispute resolution
+(define-private (resolve-dispute (disputer principal))
+    (match (map-get? disputes {disputer: disputer})
+        dispute-data (begin
+            (map-set disputes 
+                {disputer: disputer}
+                (merge dispute-data {resolved: true}))
+            true)
+        false
+    )
+)
+
+;; Emergency and Administrative Functions
+
+(define-public (deactivate-contract)
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
+        (var-set is-active false)
+        (ok true)
+    )
+)
+
+(define-public (update-required-confirmations (new-count uint))
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
+        (var-set required-confirmations new-count)
+        (ok true)
+    )
+)
+
+;; Read-Only Functions
+
+;; Enhanced getters
+(define-read-only (get-beneficiary-info (beneficiary principal))
+    (map-get? beneficiaries {beneficiary: beneficiary})
+)
+
+(define-read-only (get-contract-status)
+    {
+        active: (var-get is-active),
+        death-confirmed: (var-get death-confirmed),
+        confirmation-count: (var-get confirmation-count),
+        required-confirmations: (var-get required-confirmations),
+        last-will-hash: (var-get last-will-hash),
+        inheritance-tax: (var-get inheritance-tax)
+    }
+)
+
+(define-read-only (get-nft-owner (token-id uint))
+    (map-get? nft-ownership token-id)
+)
