@@ -58,3 +58,33 @@
         true
     )
 )
+
+;; Add beneficiary with time-locked share and NFT allocation
+(define-public (add-beneficiary (beneficiary principal) 
+                               (share uint)
+                               (lock-period uint)
+                               (nft-list (list 10 uint)))
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
+        (asserts! (var-get is-active) ERR-NOT-ACTIVE)
+        (asserts! (<= share u100) ERR-INVALID-SHARE)
+        (map-set beneficiaries 
+            {beneficiary: beneficiary} 
+            {
+                share: share, 
+                claimed: false,
+                time-lock: (+ stacks-block-height lock-period),
+                nft-tokens: nft-list
+            })
+        (ok true)
+    )
+)
+
+;; Update last will document hash
+(define-public (update-will-hash (new-hash (buff 32)))
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
+        (var-set last-will-hash new-hash)
+        (ok true)
+    )
+)
