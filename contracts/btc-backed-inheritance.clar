@@ -175,3 +175,40 @@
         )
     )
 )
+
+;; Dispute Resolution System
+
+(define-map disputes 
+    { disputer: principal } 
+    { 
+        evidence-hash: (buff 32), 
+        resolved: bool 
+    }
+)
+
+(define-map dispute-metadata
+    { disputer: principal }
+    {
+        resolution-votes: uint,
+        timestamp: uint
+    }
+)
+
+(define-map resolution-votes 
+    { dispute-id: principal, voter: principal } 
+    bool
+)
+
+;; Voting threshold for dispute resolution
+(define-data-var resolution-threshold uint u3)
+
+;; Raise a dispute with evidence
+(define-public (raise-dispute (evidence-hash (buff 32)))
+    (let ((beneficiary-data (unwrap! (map-get? beneficiaries {beneficiary: tx-sender}) ERR-NOT-AUTHORIZED)))
+        (begin
+            (map-set disputes 
+                {disputer: tx-sender}
+                {evidence-hash: evidence-hash, resolved: false})
+            (ok true))
+    )
+)
