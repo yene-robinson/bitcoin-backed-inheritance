@@ -137,3 +137,41 @@
         )
     )
 )
+
+;; Helper function for NFT transfer
+(define-private (transfer-nft (token-id uint))
+    (begin
+        (map-set nft-ownership token-id tx-sender)
+        true
+    )
+)
+
+;; Phased Inheritance Release
+
+(define-map inheritance-phases 
+    { beneficiary: principal } 
+    {
+        phase-1-claimed: bool,
+        phase-2-claimed: bool,
+        phase-1-amount: uint,
+        phase-2-amount: uint
+    }
+)
+
+;; Claim phased inheritance
+(define-private (claim-phase-1 (phase-data {phase-1-claimed: bool, phase-2-claimed: bool, phase-1-amount: uint, phase-2-amount: uint}))
+    (begin
+        (asserts! (not (get phase-1-claimed phase-data)) ERR-ALREADY-CLAIMED)
+        (let ((amount (/ (* (stx-get-balance (as-contract tx-sender)) 
+                          (get phase-1-amount phase-data)) 
+                       u100)))
+            (begin
+                (map-set inheritance-phases 
+                    {beneficiary: tx-sender}
+                    (merge phase-data {phase-1-claimed: true}))
+                (as-contract
+                    (stx-transfer? amount contract-caller tx-sender))
+            )
+        )
+    )
+)
