@@ -88,3 +88,52 @@
         (ok true)
     )
 )
+
+;; Oracle Verification System
+
+;; Oracle death confirmation with multi-sig requirement
+(define-public (confirm-death)
+    (begin
+        (asserts! (default-to false (map-get? oracles tx-sender)) ERR-NOT-AUTHORIZED)
+        (var-set confirmation-count (+ (var-get confirmation-count) u1))
+        (if (>= (var-get confirmation-count) (var-get required-confirmations))
+            (var-set death-confirmed true)
+            false)
+        (ok true)
+    )
+)
+
+;; Inheritance Claim Functions
+
+;; Claim inheritance with time-lock and NFT transfer
+(define-public (claim-inheritance)
+    (let ((beneficiary-data (unwrap! (map-get? beneficiaries {beneficiary: tx-sender}) 
+                                    ERR-NOT-AUTHORIZED)))
+        (begin
+            (asserts! (var-get death-confirmed) ERR-DEATH-NOT-CONFIRMED)
+            (asserts! (not (get claimed beneficiary-data)) ERR-ALREADY-CLAIMED)
+            (asserts! (>= stacks-block-height (get time-lock beneficiary-data)) ERR-TIME-LOCK)
+
+            ;; Calculate share amount with inheritance tax
+            (let ((share-amount (/ (* (stx-get-balance (as-contract tx-sender)) 
+                                    (get share beneficiary-data)) 
+                                 u100))
+                  (tax-amount (/ (* share-amount (var-get inheritance-tax)) u100)))
+
+                ;; Transfer NFTs
+                (map transfer-nft (get nft-tokens beneficiary-data))
+
+                ;; Update claimed status
+                (map-set beneficiaries 
+                    {beneficiary: tx-sender}
+                    (merge beneficiary-data {claimed: true}))
+
+                ;; Transfer share minus tax
+                (as-contract
+                    (stx-transfer? (- share-amount tax-amount) 
+                                 contract-caller tx-sender)
+                )
+            )
+        )
+    )
+)
