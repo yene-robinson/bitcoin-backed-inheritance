@@ -39,6 +39,22 @@
 (define-constant ERR-PHASE-1-NOT-CLAIMED (err u108))
 (define-constant ERR-ALREADY-VOTED (err u109))
 (define-constant ERR-NO-DISPUTE (err u110))
+(define-constant ERR-INVALID-PRINCIPAL (err u111))
+(define-constant ERR-INVALID-LOCK-PERIOD (err u112))
+(define-constant ERR-INVALID-NFT-LIST (err u113))
+(define-constant ERR-INVALID-HASH (err u114))
+(define-constant ERR-DISPUTE-EXISTS (err u115))
+(define-constant ERR-INVALID-CONFIRMATION-COUNT (err u116))
+
+;; Helper function to check NFT validity
+(define-private (check-nft-validity (token-id uint) (previous-valid bool))
+    (and previous-valid (> token-id u0))
+)
+
+;; Helper function to validate NFT list
+(define-private (valid-nft-list (nft-list (list 10 uint)))
+    (fold check-nft-validity nft-list true)
+)
 
 ;; Contract Administration Functions
 
@@ -68,6 +84,13 @@
         (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
         (asserts! (var-get is-active) ERR-NOT-ACTIVE)
         (asserts! (<= share u100) ERR-INVALID-SHARE)
+        
+        ;; Add validation for lock-period
+        (asserts! (> lock-period u0) ERR-INVALID-LOCK-PERIOD)
+        
+        ;; Add validation for nft-list
+        (asserts! (valid-nft-list nft-list) ERR-INVALID-NFT-LIST)
+        
         (map-set beneficiaries 
             {beneficiary: beneficiary} 
             {
@@ -84,6 +107,8 @@
 (define-public (update-will-hash (new-hash (buff 32)))
     (begin
         (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
+        ;; Check that hash is not empty
+        (asserts! (not (is-eq new-hash 0x)) ERR-INVALID-HASH)
         (var-set last-will-hash new-hash)
         (ok true)
     )
@@ -104,6 +129,19 @@
 )
 
 ;; Inheritance Claim Functions
+
+;; Helper function for NFT transfer
+(define-private (transfer-nft (token-id uint))
+    (begin
+        ;; Verify the NFT ID is valid
+        (if (> token-id u0)
+            (begin
+                ;; Set new ownership
+                (map-set nft-ownership token-id tx-sender)
+                (ok true))
+            (err ERR-INVALID-NFT))
+    )
+)
 
 ;; Claim inheritance with time-lock and NFT transfer
 (define-public (claim-inheritance)
@@ -135,14 +173,6 @@
                 )
             )
         )
-    )
-)
-
-;; Helper function for NFT transfer
-(define-private (transfer-nft (token-id uint))
-    (begin
-        (map-set nft-ownership token-id tx-sender)
-        true
     )
 )
 
@@ -206,6 +236,12 @@
 (define-public (raise-dispute (evidence-hash (buff 32)))
     (let ((beneficiary-data (unwrap! (map-get? beneficiaries {beneficiary: tx-sender}) ERR-NOT-AUTHORIZED)))
         (begin
+            ;; Check that evidence hash is not empty
+            (asserts! (not (is-eq evidence-hash 0x)) ERR-INVALID-HASH)
+            
+            ;; Check if dispute already exists
+            (asserts! (is-none (map-get? disputes {disputer: tx-sender})) ERR-DISPUTE-EXISTS)
+            
             (map-set disputes 
                 {disputer: tx-sender}
                 {evidence-hash: evidence-hash, resolved: false})
@@ -238,6 +274,8 @@
 (define-public (update-required-confirmations (new-count uint))
     (begin
         (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
+        ;; Validate new confirmation count
+        (asserts! (> new-count u0) ERR-INVALID-CONFIRMATION-COUNT)
         (var-set required-confirmations new-count)
         (ok true)
     )
